@@ -32,19 +32,12 @@
   <script src="./lib/postprocessing/UnrealBloomPass.js"></script>
   <script src="./lib/shaders/CopyShader.js"></script>
   <script src="./lib/shaders/LuminosityHighPassShader.js"></script>
-  <script src="./lib/utils/BufferGeometryUtils.js"></script>
 
   <script src="./js/EllipseCurve3D.js"></script>
   <script src="./js/InTheMoodToExtrude.js"></script>
-  <script src="./js/Logoform.js"></script>
   <script src="./js/HalftonePass.js"></script>
 
   <script>
-
-    const link = document.createElement( 'a' );
-    link.text = "Download STL";
-    link.style.display = 'none';
-    document.body.appendChild( link );
 
     const renderer = new THREE.WebGLRenderer();
     renderer.setClearColor( 0x000000, 0 );
@@ -82,40 +75,12 @@
     const group = new THREE.Group();
     scene.add(group);
 
-    const logoform = makeLogoform();
-
     const material =
       // new THREE.MeshBasicMaterial({wireframe: true});
       new THREE.MeshPhysicalMaterial({color: 0xFFFFFF, roughness: 0.5, metalness: 0, reflectivity: 0, emissive: 0x0});
 
-    const model = new THREE.Mesh(logoform, material);
+    const model = new THREE.Mesh(makeCurve(3, 0, 2, 0, 0, -3, 0, 0, 0, t => t * 6), material);
     group.add(model);
-
-    const stl = (new THREE.STLExporter()).parse(model, { binary: true });
-    link.href = URL.createObjectURL(new Blob( [ stl ], { type: 'application/octet-stream' } ));
-    link.download = 'rm.stl';
-    link.style.display = 'unset';
-    // link.click();
-
-    /*
-    (new THREE.SVGLoader()).load('rm.svg', paths => {
-      const svgGroup = new THREE.Group();
-      paths.map(path => path.toShapes(true)).forEach(
-        shapes => shapes.forEach(
-          shape => svgGroup.add(
-            new THREE.Mesh(
-              new THREE.ShapeBufferGeometry( shape ),
-              new THREE.MeshBasicMaterial({color: 0xFF0000, transparent:true, opacity: 0.5, side: THREE.DoubleSide})
-              )
-            )
-          )
-        );
-      const scale = 0.01 / Math.SQRT1_2;
-      svgGroup.scale.set(scale, -scale, scale);
-      svgGroup.position.set(-240 * scale, 150 * scale, 0 * scale);
-      // group.add( svgGroup );
-    });
-    */
 
     const composer = new THREE.EffectComposer( renderer );
     const renderPass = new THREE.RenderPass( scene, camera );
