@@ -11,8 +11,8 @@ THREE.HalftonePass = function (color1, color2, dotScale = 1, angle = 45, thresho
       dotScale: { value: dotScale },
       angle: { value: angle },
       threshold: { value: threshold },
-      width: { value: width },
-      height: { value: height },
+      width: { value: 1 },
+      height: { value: 1 },
     },
 
     vertexShader: `

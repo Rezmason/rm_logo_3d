@@ -23,20 +23,21 @@
 <body>
 
   <script src="./lib/three.js"></script>
-  <script src="./lib/EllipseCurve3D.js"></script>
-  <script src="./lib/SVGLoader.js"></script>
-  <script src="./lib/EffectComposer.js"></script>
-  <script src="./lib/RenderPass.js"></script>
-  <script src="./lib/ShaderPass.js"></script>
-  <script src="./lib/BufferGeometryUtils.js"></script>
-  <script src="./lib/UnrealBloomPass.js"></script>
-  <script src="./lib/LuminosityHighPassShader.js"></script>
 
-  <script src="./lib/CopyShader.js"></script>
-  <script src="./lib/STLExporter.js" ></script>
+  <script src="./lib/exporters/STLExporter.js" ></script>
+  <script src="./lib/loaders/SVGLoader.js"></script>
+  <script src="./lib/postprocessing/EffectComposer.js"></script>
+  <script src="./lib/postprocessing/RenderPass.js"></script>
+  <script src="./lib/postprocessing/ShaderPass.js"></script>
+  <script src="./lib/postprocessing/UnrealBloomPass.js"></script>
+  <script src="./lib/shaders/CopyShader.js"></script>
+  <script src="./lib/shaders/LuminosityHighPassShader.js"></script>
+  <script src="./lib/utils/BufferGeometryUtils.js"></script>
 
+  <script src="./js/EllipseCurve3D.js"></script>
+  <script src="./js/InTheMoodToExtrude.js"></script>
+  <script src="./js/Logoform.js"></script>
   <script src="./js/HalftonePass.js"></script>
-
 
   <script>
 
@@ -81,249 +82,13 @@
     const group = new THREE.Group();
     scene.add(group);
 
-    const geometries = [];
+    const logoform = makeLogoform();
 
-    // const material = new THREE.MeshBasicMaterial({wireframe: true});
-    const material = new THREE.MeshPhysicalMaterial({color: 0xFFFFFF, roughness: 0.5, metalness: 0, reflectivity: 0, emissive: 0x0});
+    const material =
+      // new THREE.MeshBasicMaterial({wireframe: true});
+      new THREE.MeshPhysicalMaterial({color: 0xFFFFFF, roughness: 0.5, metalness: 0, reflectivity: 0, emissive: 0x0});
 
-    const addCurve = (radius = 1, startRadians = 0, endRadians = 2, x = 0, y = 0, z = 0, rX = 0, rY = 0, rZ = 0, distortion = null) => {
-      const segments = distortion == null ? 1 : 20, steps = Math.max(1, Math.round(60 * (radius + 1) * Math.abs(endRadians - startRadians)));
-      const geom = new THREE.ExtrudeBufferGeometry(
-        new THREE.Shape(
-          [].concat(...
-            Array(4).fill(null).map((_, index) => {
-              const a = (index + 0.5) / 4 * 2 * Math.PI;
-              return new THREE.Vector2( Math.cos( a ) * Math.SQRT1_2, Math.sin( a ) * Math.SQRT1_2 );
-            }).map((p1, index, array) => {
-              const p2 = array[(index + 1) % array.length];
-              return Array(segments).fill(null).map((_, segIndex) => (new THREE.Vector3()).lerpVectors(p1, p2, segIndex / segments)).concat([p2]);
-            })
-            )
-          ),
-        {
-          steps,
-          bevelEnabled: false,
-          extrudePath: new EllipseCurve3D(0,  0, radius, radius, startRadians * Math.PI,  endRadians * Math.PI)
-        }
-        );
-
-      if (distortion != null) {
-        // geom.addAttribute('color', new THREE.BufferAttribute( new Float32Array( geom.attributes.position.count * 3 ), 3 ));
-        // const colors = geom.attributes.color;
-        const positions = geom.attributes.position;
-
-        const capSize = geom.attributes.position.count / 12 - steps * segments * 2;
-        const offsets = [
-        0,
-        capSize,
-        capSize,
-        steps * (segments - 1),
-        steps * segments,
-        steps * segments,
-        steps * segments,
-        steps
-        ];
-        const indices = [0];
-        for (let i = 1; i < offsets.length; i++) {
-          indices[i] = indices[i - 1] + offsets[i] * 6;
-        }
-        const adjustVertex = (i, step) => {
-          const t = step / steps;
-          // colors.setXYZ(i, 1, t, 0);
-          // colors.setXYZ(i, 1, 1, 1);
-          positions.setZ(i, positions.getZ(i) + distortion(t));
-        }
-
-        const computeStep = index => {
-          let step = Math.floor(index / 6 % steps);
-          const fraction = index % 6;
-          if (fraction == 2 || fraction == 4 || fraction == 5) step++;
-          return step;
-        }
-
-        for (let i = indices[0]; i < indices[1]; i++) {
-          adjustVertex(i, 0);
-        }
-        for (let i = indices[1]; i < indices[2]; i++) {
-          adjustVertex(i, steps);
-        }
-        for (let i = indices[2]; i < indices[3]; i++) {
-          adjustVertex(i, computeStep(i - indices[2]));
-        }
-        for (let i = indices[3]; i < indices[4]; i++) {
-          adjustVertex(i, computeStep(i - indices[3]));
-        }
-        for (let i = indices[4]; i < indices[5]; i++) {
-          adjustVertex(i, computeStep(i - indices[4]));
-        }
-        for (let i = indices[5]; i < indices[6]; i++) {
-          adjustVertex(i, computeStep(i - indices[5]));
-        }
-        for (let i = indices[6]; i < indices[7]; i++) {
-          adjustVertex(i, computeStep(i - indices[6]));
-        }
-
-      }
-
-      geom.computeVertexNormals();
-
-      const matrix = new THREE.Matrix4();
-      matrix.makeRotationFromEuler(new THREE.Euler(Math.PI * rX, Math.PI * rY, Math.PI * rZ));
-      matrix.setPosition(new THREE.Vector3(x, y, z));
-      geom.applyMatrix(matrix);
-      geometries.push(geom);
-    };
-
-    const addStraight = (length = 1, x = 0, y = 0, z = 0, rX = 0, rY = 0, rZ = 0, distortion = null) => {
-      const segments = 1, steps = 1;
-      const geom = new THREE.ExtrudeBufferGeometry(
-        new THREE.Shape(
-          [].concat(...
-            Array(4).fill(null).map((_, index) => {
-              const a = (index + 0.5) / 4 * 2 * Math.PI;
-              return new THREE.Vector2( Math.cos( a ) * Math.SQRT1_2, Math.sin( a ) * Math.SQRT1_2 );
-            }).map((p1, index, array) => {
-              const p2 = array[(index + 1) % array.length];
-              return Array(segments).fill(null).map((_, segIndex) => (new THREE.Vector3()).lerpVectors(p1, p2, segIndex / segments)).concat([p2]);
-            })
-            )
-          ),
-        {
-          steps,
-          bevelEnabled: false,
-          extrudePath: new THREE.LineCurve3(new THREE.Vector3(), new THREE.Vector3(0, 0, length))
-        }
-        );
-
-      if (distortion != null) {
-        // geom.addAttribute('color', new THREE.BufferAttribute( new Float32Array( geom.attributes.position.count * 3 ), 3 ));
-        // const colors = geom.attributes.color;
-        const positions = geom.attributes.position;
-
-        const capSize = geom.attributes.position.count / 12 - steps * segments * 2;
-        const offsets = [
-        0,
-        capSize,
-        capSize,
-        steps * (segments - 1),
-        steps * segments,
-        steps * segments,
-        steps * segments,
-        steps
-        ];
-        const indices = [0];
-        for (let i = 1; i < offsets.length; i++) {
-          indices[i] = indices[i - 1] + offsets[i] * 6;
-        }
-        const adjustVertex = (i, step) => {
-          const t = step / steps;
-          // colors.setXYZ(i, 1, t, 0);
-          // colors.setXYZ(i, 1, 1, 1);
-          positions.setX(i, positions.getX(i) + distortion(t));
-        }
-
-        const computeStep = index => {
-          let step = Math.floor(index / 6 % steps);
-          const fraction = index % 6;
-          if (fraction == 2 || fraction == 4 || fraction == 5) step++;
-          return step;
-        }
-
-        for (let i = indices[0]; i < indices[1]; i++) {
-          adjustVertex(i, 0);
-        }
-        for (let i = indices[1]; i < indices[2]; i++) {
-          adjustVertex(i, steps);
-        }
-        for (let i = indices[2]; i < indices[3]; i++) {
-          adjustVertex(i, computeStep(i - indices[2]));
-        }
-        for (let i = indices[3]; i < indices[4]; i++) {
-          adjustVertex(i, computeStep(i - indices[3]));
-        }
-        for (let i = indices[4]; i < indices[5]; i++) {
-          adjustVertex(i, computeStep(i - indices[4]));
-        }
-        for (let i = indices[5]; i < indices[6]; i++) {
-          adjustVertex(i, computeStep(i - indices[5]));
-        }
-        for (let i = indices[6]; i < indices[7]; i++) {
-          adjustVertex(i, computeStep(i - indices[6]));
-        }
-
-      }
-
-      geom.computeVertexNormals();
-
-      const matrix = new THREE.Matrix4();
-      matrix.makeRotationFromEuler(new THREE.Euler(Math.PI * rX, Math.PI * rY, Math.PI * rZ));
-      matrix.setPosition(new THREE.Vector3(x, y, z));
-      geom.applyMatrix(matrix);
-      geometries.push(geom);
-    };
-
-    const whatTheActualFuck = Math.SQRT1_2;
-
-    const thickness = 0.5;
-    const width = 9.6 * whatTheActualFuck;
-    const height = 6 * whatTheActualFuck;
-
-    const xLeft = -width / 2;
-    const xRight = width / 2;
-
-    const yTop = height / 2;
-    const yMiddle = 0.25 * whatTheActualFuck;
-    const yBottom = -height / 2;
-    const rRadius = (yMiddle - yBottom) / 2 - thickness;
-    const mRadius = height / 2 - thickness;
-
-    const zBase = -0.5;
-    const zFront = zBase + rRadius + thickness;
-    const zBack = zBase - mRadius - thickness;
-
-    const rSideRadius = zFront;
-
-    addCurve((yTop - yMiddle) / 2, 0, 1, xLeft + 2.25, (yTop + yMiddle) / 2 - thickness, zBase, 0, 0, -0.5); // R straightforward curl
-    addStraight((2.25 - rSideRadius - thickness), xLeft + rSideRadius + thickness, yTop - thickness, zBase, 0, 0.5); // R top left horizontal | straight bit
-    addStraight((2.25 - rSideRadius - thickness), xLeft + rSideRadius + thickness, yMiddle - thickness, zBase, 0, 0.5); // R bottom left horizontal | straight bit
-    addCurve(rSideRadius, 0.5, 1, xLeft + rSideRadius + thickness, yMiddle - thickness, zFront - thickness, 1.5); // R bottom left horizontal | bendy bit
-    addStraight(yMiddle - yBottom, xLeft + 0.5, yMiddle, zFront, 0.5, 0, 0); // R bottom left vertical
-
-    // • //addStraight(zFront - zBack - thickness * 2,  xRight - thickness, yBottom + thickness, zFront - thickness, 0, 1); // M bottom right base
-    addStraight(zFront - zBack - thickness * 2, xLeft + thickness, yBottom + thickness, zFront - thickness, 0, 1); // R bottom left base
-
-    addCurve(rRadius, 0, 1, xLeft + 1 + thickness + 0.25, (yMiddle + yBottom) / 2, 0, 0, 0.5, 0.5, t => {
-      const r1 = t * 3;
-      const r2 = t * 1.75;
-      return t * r2 + (1 - t) * r1;
-    }); // R helix
-    addCurve(mRadius, 1.5, 2.5, 0.1, 0, 0, 0, 0.5, 0, t => {
-      const r1 = t * 1.75;
-      const r2 = t * (width / 2 - Math.SQRT1_2 + 0.1);
-      return t * r2 + (1 - t) * r1;
-    }); // M helix
-
-
-    const mShootRadius = (zFront - zBack - thickness * 2) / 2;
-    addCurve(mShootRadius, 0, 1, xRight - thickness, yBottom + thickness * 1.5, zFront - mShootRadius, 0, 0.5, 0); // M hidden shoot | curvy bit
-    addStraight(thickness * 1.5, xRight - thickness, yBottom, zBack + thickness * 2, 1.5); // M hidden shoot | straight bit
-
-
-    // • //addStraight(height, xRight - thickness, height / 2, zFront, 0.5, 0, 0); // M right vertical
-    // • //addStraight(rRadius - thickness, xRight - thickness, height / 2 - thickness, 0, 0, 0); // M post-helix
-
-    // • //addStraight(height, xRight - thickness, height / 2, zFront, 0.5, 0, 0); // M right vertical
-
-    addCurve(rRadius, 0, 0.5, xRight - thickness, yTop - rRadius - thickness, 0, 0, 0.5, 0.5); // M right vertical | bendy bit
-    addStraight(height - rRadius - thickness, xRight - thickness, height / 2 - rRadius - thickness, zFront, 0.5, 0, 0); // M right vertical | straight bit
-
-    addCurve(rSideRadius, 0.5, 1, xLeft + rSideRadius + thickness, yTop - thickness, zBase - rSideRadius, 0.5); // R bottom left horizontal | bendy bit
-    addStraight((zBase - rSideRadius) - zBack - thickness, xLeft + thickness, yTop - thickness, zBase - rSideRadius, 0, 1); // R top left extension | curvy bit
-
-    const model = new THREE.Mesh(
-      THREE.BufferGeometryUtils.mergeBufferGeometries(geometries),
-      material
-    );
+    const model = new THREE.Mesh(logoform, material);
     group.add(model);
 
     const stl = (new THREE.STLExporter()).parse(model, { binary: true });
@@ -354,18 +119,20 @@
 
     const composer = new THREE.EffectComposer( renderer );
     const renderPass = new THREE.RenderPass( scene, camera );
-    const halftonePass = new THREE.HalftonePass(0x220000, 0xFFFFD8, Math.pow(2, -4.65), 30, 0.7);
-    halftonePass.setSize(window.innerWidth, window.innerHeight);
     composer.addPass( renderPass );
+
+    const halftonePass = new THREE.HalftonePass(0x220000, 0xFFFFD8, Math.pow(2, -4.65), 30, 0.7);
+    composer.addPass( halftonePass );
+
     const bloomPass = new THREE.UnrealBloomPass(
       new THREE.Vector2( window.innerWidth, window.innerHeight ), 0.5, 1.5, 0
     );
     composer.addPass( bloomPass );
-    composer.addPass( halftonePass );
-    window.addEventListener("resize", () => {
+
+    const resize = () => {
       renderer.setSize( window.innerWidth, window.innerHeight );
       composer.setSize( window.innerWidth, window.innerHeight );
-      halftonePass.setSize(window.innerWidth, window.innerHeight);
+
       perspectiveCamera.aspect = window.innerWidth / window.innerHeight;
       perspectiveCamera.updateProjectionMatrix();
       orthographicCamera.left = -window.innerWidth / cameraCloseness;
@@ -373,14 +140,15 @@
       orthographicCamera.top = window.innerHeight / cameraCloseness;
       orthographicCamera.bottom = -window.innerHeight / cameraCloseness;
       orthographicCamera.updateProjectionMatrix();
-    });
 
+      halftonePass.setSize(window.innerWidth, window.innerHeight);
+    };
+    window.addEventListener("resize", resize);
+    resize();
     composer.passes[composer.passes.length - 1].renderToScreen = true;
 
     let [mouseX, mouseY] = [0, 0];
-
     const pan = ({screenX, screenY}) => [mouseX, mouseY] = [screenX / window.innerWidth - 0.5, screenY / window.innerHeight - 0.5];
-
     window.addEventListener("mousemove", pan);
     window.addEventListener("touchmove", ({touches}) => pan(touches[0]));
     window.addEventListener("click", () => {
@@ -388,12 +156,12 @@
       renderPass.camera = camera;
     });
 
-    function animate() {
-      requestAnimationFrame( animate );
+    function redraw() {
+      requestAnimationFrame( redraw );
       group.rotation.set(mouseY * 8, mouseX * 8, 0);
       composer.render( 0 );
     }
-    animate();
+    redraw();
 
   </script>
 
