@@ -41,10 +41,15 @@
 
   <script>
 
-    const link = document.createElement( 'a' );
-    link.text = "Download STL";
-    link.style.display = 'none';
-    document.body.appendChild( link );
+    const linkWhole = document.createElement( 'a' );
+    linkWhole.text = "Download STL (Whole)";
+    linkWhole.style.display = 'none';
+    document.body.appendChild( linkWhole );
+
+    const linkApart = document.createElement( 'a' );
+    linkApart.text = "Download STL (Apart)";
+    linkApart.style.display = 'none';
+    document.body.appendChild( linkApart );
 
     const renderer = new THREE.WebGLRenderer();
     renderer.setClearColor( 0x000000, 0 );
@@ -54,7 +59,7 @@
 
     const scene = new THREE.Scene();
 
-    const cameraCloseness = 150;
+    const cameraCloseness = 200;
     const perspectiveCamera = new THREE.PerspectiveCamera( 45, window.innerWidth / window.innerHeight, 1, 1000 );
     const orthographicCamera = new THREE.OrthographicCamera( window.innerWidth / - cameraCloseness, window.innerWidth / cameraCloseness, window.innerHeight / cameraCloseness, window.innerHeight / -cameraCloseness, - 500, 1000);
     [perspectiveCamera, orthographicCamera].forEach(camera => {
@@ -82,20 +87,90 @@
     const group = new THREE.Group();
     scene.add(group);
 
-    const logoform = makeLogoform();
-
-    const material =
-      // new THREE.MeshBasicMaterial({wireframe: true});
-      new THREE.MeshPhysicalMaterial({color: 0xFFFFFF, roughness: 0.5, metalness: 0, reflectivity: 0, emissive: 0x0});
-
-    const model = new THREE.Mesh(logoform, material);
+    const model = new THREE.Group();
     group.add(model);
+    const laidOutModel = new THREE.Group();
+    group.add(laidOutModel);
+    laidOutModel.visible = false;
 
-    const stl = (new THREE.STLExporter()).parse(model, { binary: true });
-    link.href = URL.createObjectURL(new Blob( [ stl ], { type: 'application/octet-stream' } ));
-    link.download = 'rm.stl';
-    link.style.display = 'unset';
-    // link.click();
+    const logoformUnions = makeLogoform().map(geoms => THREE.BufferGeometryUtils.mergeBufferGeometries(geoms));
+
+    const pieceTransforms = [
+      {
+        color: 0xFFFFFF,
+        position: new THREE.Vector3(5, Math.SQRT1_2 * -4.8 + 0.5, 0),
+        rotation: new THREE.Euler(Math.PI * 0, Math.PI * 0, Math.PI * 1.5),
+      },
+      {
+        color: 0xFF0000,
+        position: new THREE.Vector3(2, Math.SQRT1_2 * -4.8 + 0.5, -3),
+        rotation: new THREE.Euler(Math.PI * 0, Math.PI * 1, Math.PI * 0.5),
+      },
+      {
+        color: 0xFFFF00,
+        position: new THREE.Vector3(0, Math.SQRT1_2 * -3 + 0.5, 0.5),
+        rotation: new THREE.Euler(Math.PI * 0, Math.PI * 2, Math.PI * 0),
+      },
+      {
+        color: 0x00FF00,
+        position: new THREE.Vector3(-1, -0.5, -3),
+        rotation: new THREE.Euler(Math.PI * 0.5, Math.PI * 0, Math.PI * 0),
+      },
+      {
+        color: 0x00FFFF,
+        position: new THREE.Vector3(0.25, Math.SQRT1_2 * -0.25 + 0.5, -1.5),
+        rotation: new THREE.Euler(Math.PI * 0, Math.PI * 0.5, Math.PI * 0),
+      },
+      {
+        color: 0x0000FF,
+        position: new THREE.Vector3(-1, -0.5, 1),
+        rotation: new THREE.Euler(Math.PI * 1.5, Math.PI * 0, Math.PI * 0),
+      },
+      {
+        color: 0xFF00FF,
+        position: new THREE.Vector3(1, -0.5, 2),
+        rotation: new THREE.Euler(Math.PI * 0.5, Math.PI * 0, Math.PI * 0),
+      },
+    ];
+
+    const modelMaterial = new THREE.MeshPhysicalMaterial({color: 0xFFFFFF, roughness: 0.5, metalness: 0, reflectivity: 0, emissive: 0x0});
+
+    const laidOutGeometries = logoformUnions.map((geom, i) => {
+
+      model.add(new THREE.Mesh(geom, modelMaterial));
+
+      const pieceTransform = pieceTransforms[i];
+      const matrix = new THREE.Matrix4();
+      matrix.makeRotationFromEuler(pieceTransform.rotation);
+      matrix.setPosition(pieceTransform.position);
+      const laidOutGeom = geom.clone();
+      laidOutGeom.applyMatrix(matrix);
+
+      const material =
+      new THREE.MeshBasicMaterial({color: pieceTransforms[i].color, wireframe: true});
+      // new THREE.MeshPhysicalMaterial({color: pieceTransforms[i].color, roughness: 0.5, metalness: 0, reflectivity: 0, emissive: 0x0});
+
+      laidOutModel.add(new THREE.Mesh(laidOutGeom, material))
+
+      return laidOutGeom;
+    });
+
+    const mergedGeom = THREE.BufferGeometryUtils.mergeBufferGeometries(laidOutGeometries);
+    const laidOutMesh = new THREE.Mesh(
+      mergedGeom,
+      new THREE.MeshPhysicalMaterial({color:0xFFFFFF, roughness: 0.5, metalness: 0, reflectivity: 0, emissive: 0x0})
+    );
+
+    const stlWhole = (new THREE.STLExporter()).parse(model, { binary: true });
+    linkWhole.href = URL.createObjectURL(new Blob( [ stlWhole ], { type: 'application/octet-stream' } ));
+    linkWhole.download = 'rm_whole.stl';
+    linkWhole.style.display = 'unset';
+
+    const stlApart = (new THREE.STLExporter()).parse(laidOutMesh, { binary: true });
+    linkApart.href = URL.createObjectURL(new Blob( [ stlApart ], { type: 'application/octet-stream' } ));
+    linkApart.download = 'rm_apart.stl';
+    linkApart.style.display = 'unset';
+
 
     /*
     (new THREE.SVGLoader()).load('rm.svg', paths => {
@@ -162,6 +237,33 @@
       composer.render( 0 );
     }
     redraw();
+
+    let mode = 0;
+    const setMode = value => {
+      mode = value;
+      switch (mode) {
+        case 0:
+          model.visible = true;
+          laidOutModel.visible = false;
+          composer.passes[composer.passes.length - 1].renderToScreen = true;
+          renderPass.renderToScreen = false;
+        break;
+        case 1:
+          model.visible = true;
+          laidOutModel.visible = false;
+          composer.passes[composer.passes.length - 1].renderToScreen = false;
+          renderPass.renderToScreen = true;
+        break;
+        case 2:
+          model.visible = false;
+          laidOutModel.visible = true;
+          composer.passes[composer.passes.length - 1].renderToScreen = false;
+          renderPass.renderToScreen = true;
+        break;
+      }
+    };
+    setMode(0);
+    document.addEventListener("keydown", () => setMode((mode + 1) % 3));
 
   </script>
 
