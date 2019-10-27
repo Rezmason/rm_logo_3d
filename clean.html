@@ -1,0 +1,222 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <title>three.js webgl - geometry - extrude shapes</title>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, user-scalable=no, minimum-scale=1.0, maximum-scale=1.0">
+  <style>
+    html, body {
+      overflow: hidden;
+    }
+    body {
+      position: relative;
+      font-family: Monospace;
+      background-color: #000;
+      margin: 0px;
+    }
+    a {
+      color: skyblue;
+    }
+</style>
+</head>
+
+<body>
+
+  <script src="./lib/three.js"></script>
+
+  <script src="./lib/loaders/OBJLoader.js" ></script>
+  <script src="./lib/exporters/STLExporter.js" ></script>
+  <script src="./lib/utils/BufferGeometryUtils.js"></script>
+
+  <script src="./js/EllipseCurve3D.js"></script>
+  <script src="./js/InTheMoodToExtrude.js"></script>
+  <script src="./js/Logoform.js"></script>
+
+  <script>
+
+    const linkWhole = document.createElement( 'a' );
+    linkWhole.text = "Download STL (Whole)";
+    linkWhole.style.display = 'none';
+    document.body.appendChild( linkWhole );
+
+    const linkApart = document.createElement( 'a' );
+    linkApart.text = "Download STL (Apart)";
+    linkApart.style.display = 'none';
+    document.body.appendChild( linkApart );
+
+    const renderer = new THREE.WebGLRenderer();
+    renderer.setClearColor( 0x000000, 0 );
+    renderer.setPixelRatio( window.devicePixelRatio );
+    renderer.setSize( window.innerWidth, window.innerHeight );
+    document.body.appendChild( renderer.domElement );
+
+    const scene = new THREE.Scene();
+
+    const cameraCloseness = 200;
+    const perspectiveCamera = new THREE.PerspectiveCamera( 45, window.innerWidth / window.innerHeight, 1, 1000 );
+    const orthographicCamera = new THREE.OrthographicCamera( window.innerWidth / - cameraCloseness, window.innerWidth / cameraCloseness, window.innerHeight / cameraCloseness, window.innerHeight / -cameraCloseness, - 500, 1000);
+    [perspectiveCamera, orthographicCamera].forEach(camera => {
+      camera.position.set(0, 0, 2000 / cameraCloseness );
+      scene.add(camera);
+    });
+    let camera = perspectiveCamera;
+
+    const lights = new THREE.Group();
+    scene.add(lights);
+
+    const addLight = (x, y, z) => {
+      const light = new THREE.PointLight( 0xffffff );
+      light.decay = 2;
+      light.intensity = 0.4;
+      light.position.set(x, y, z);
+      lights.add( light );
+    };
+
+    // scene.add(new THREE.AmbientLight(0xff0000, 0.05 ));
+
+    addLight(-10, 10, 10);
+    addLight(10, 10, 10);
+
+    const group = new THREE.Group();
+    scene.add(group);
+
+    const model = new THREE.Group();
+    group.add(model);
+
+    const loadedModel = new THREE.Group();
+    group.add(loadedModel);
+    const loader = new THREE.OBJLoader();
+    loader.load('rm2.obj', o => {
+      o = o.children[0];
+      loadedModel.add(o);
+      o.material = new THREE.MeshPhysicalMaterial({
+        color: 0xFFFFFF,
+        roughness: 1,
+        metalness: 0,
+        reflectivity: 0,
+        emissive: 0x0
+      });
+      // loadedModel.add(new THREE.VertexNormalsHelper(o, 0.1, 0xFF0000, 1));
+    });
+
+    const laidOutModel = new THREE.Group();
+    group.add(laidOutModel);
+    laidOutModel.visible = false;
+
+    const logoformUnions = makeLogoform().map(geoms => THREE.BufferGeometryUtils.mergeBufferGeometries(geoms));
+
+    const pieceTransforms = [
+      {
+        color: 0xFFFFFF,
+        position: new THREE.Vector3(5, Math.SQRT1_2 * -4.8 + 0.5, 0),
+        rotation: new THREE.Euler(Math.PI * 0, Math.PI * 0, Math.PI * 1.5),
+      },
+      {
+        color: 0xFF0000,
+        position: new THREE.Vector3(2, Math.SQRT1_2 * -4.8 + 0.5, -3),
+        rotation: new THREE.Euler(Math.PI * 0, Math.PI * 1, Math.PI * 0.5),
+      },
+      {
+        color: 0xFFFF00,
+        position: new THREE.Vector3(0, Math.SQRT1_2 * -3 + 0.5, 0.5),
+        rotation: new THREE.Euler(Math.PI * 0, Math.PI * 2, Math.PI * 0),
+      },
+      {
+        color: 0x00FF00,
+        position: new THREE.Vector3(-1, -0.5, -3),
+        rotation: new THREE.Euler(Math.PI * 0.5, Math.PI * 0, Math.PI * 0),
+      },
+      {
+        color: 0x00FFFF,
+        position: new THREE.Vector3(0.25, Math.SQRT1_2 * -0.25 + 0.5, -1.5),
+        rotation: new THREE.Euler(Math.PI * 0, Math.PI * 0.5, Math.PI * 0),
+      },
+      {
+        color: 0x0000FF,
+        position: new THREE.Vector3(-1, -0.5, 1),
+        rotation: new THREE.Euler(Math.PI * 1.5, Math.PI * 0, Math.PI * 0),
+      },
+      {
+        color: 0xFF00FF,
+        position: new THREE.Vector3(1, -0.5, 2),
+        rotation: new THREE.Euler(Math.PI * 0.5, Math.PI * 0, Math.PI * 0),
+      },
+    ];
+
+    // const modelMaterial = new THREE.MeshPhysicalMaterial({color: 0xFFFFFF, roughness: 0.5, metalness: 0, reflectivity: 0, emissive: 0x0});
+    const modelMaterial = new THREE.MeshBasicMaterial({color: 0xFF0000, wireframe: true});
+
+    const laidOutGeometries = logoformUnions.map((geom, i) => {
+
+      model.add(new THREE.Mesh(geom, modelMaterial));
+
+      const pieceTransform = pieceTransforms[i];
+      const matrix = new THREE.Matrix4();
+      matrix.makeRotationFromEuler(pieceTransform.rotation);
+      matrix.setPosition(pieceTransform.position);
+      const laidOutGeom = geom.clone();
+      laidOutGeom.applyMatrix(matrix);
+
+      const material =
+      new THREE.MeshBasicMaterial({color: pieceTransforms[i].color, wireframe: true});
+      // new THREE.MeshPhysicalMaterial({color: pieceTransforms[i].color, roughness: 0.5, metalness: 0, reflectivity: 0, emissive: 0x0});
+
+      laidOutModel.add(new THREE.Mesh(laidOutGeom, material))
+
+      return laidOutGeom;
+    });
+
+    const mergedGeom = THREE.BufferGeometryUtils.mergeBufferGeometries(laidOutGeometries);
+    const laidOutMesh = new THREE.Mesh(
+      mergedGeom,
+      new THREE.MeshPhysicalMaterial({color:0xFFFFFF, roughness: 0.5, metalness: 0, reflectivity: 0, emissive: 0x0})
+    );
+
+    const stlWhole = (new THREE.STLExporter()).parse(model, { binary: true });
+    linkWhole.href = URL.createObjectURL(new Blob( [ stlWhole ], { type: 'application/octet-stream' } ));
+    linkWhole.download = 'rm_whole.stl';
+    linkWhole.style.display = 'unset';
+
+    const stlApart = (new THREE.STLExporter()).parse(laidOutMesh, { binary: true });
+    linkApart.href = URL.createObjectURL(new Blob( [ stlApart ], { type: 'application/octet-stream' } ));
+    linkApart.download = 'rm_apart.stl';
+    linkApart.style.display = 'unset';
+
+    const resize = () => {
+      renderer.setSize( window.innerWidth, window.innerHeight );
+
+      perspectiveCamera.aspect = window.innerWidth / window.innerHeight;
+      perspectiveCamera.updateProjectionMatrix();
+      orthographicCamera.left = -window.innerWidth / cameraCloseness;
+      orthographicCamera.right = window.innerWidth / cameraCloseness;
+      orthographicCamera.top = window.innerHeight / cameraCloseness;
+      orthographicCamera.bottom = -window.innerHeight / cameraCloseness;
+      orthographicCamera.updateProjectionMatrix();
+    };
+    window.addEventListener("resize", resize);
+    resize();
+
+    let [mouseX, mouseY] = [0, 0];
+    const pan = ({screenX, screenY}) => [mouseX, mouseY] = [screenX / window.innerWidth - 0.5, screenY / window.innerHeight - 0.5];
+    window.addEventListener("mousemove", pan);
+    window.addEventListener("touchmove", ({touches}) => pan(touches[0]));
+    window.addEventListener("click", () => {
+      camera = (camera == perspectiveCamera) ? orthographicCamera : perspectiveCamera;
+    });
+
+    function redraw() {
+      requestAnimationFrame( redraw );
+      group.rotation.set(mouseY * 8, mouseX * 8, 0);
+      renderer.render(scene, camera);
+    }
+    redraw();
+
+    model.visible = true;
+    loadedModel.visible = false;
+    laidOutModel.visible = false;
+
+  </script>
+
+</body>
+
+</html>

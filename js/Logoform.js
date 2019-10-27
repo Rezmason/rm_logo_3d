@@ -72,21 +72,21 @@ const makeLogoform = () => {
         /* POSITION */ xLeft + 1 + thickness + 0.25, (yMiddle + yBottom) / 2, 0,
         /* ROTATION */ 0, 0.5, 0.5,
         t => {
-          const r1 = t * 3;
-          const r2 = t * 1.75;
-          return t * r2 + (1 - t) * r1;
+          const sineEasedT = Math.sin((t - 0.5) * Math.PI) * 0.5 + 0.5;
+          t = (t + sineEasedT) * 0.5;
+          return (0.1 - (xLeft + 1 + thickness + 0.25)) * t;
         }
     );
 
     // M helix
     addCurve(6,
         mRadius, 1.5, 2.5,
-        0.1, 0, 0,
-        0, 0.5, 0,
+        /* POSITION */ 0.1, 0, 0,
+        /* ROTATION */ 0, 0.5, 0,
         t => {
-          const r1 = t * 1.75;
-          const r2 = t * (width / 2 - Math.SQRT1_2 + 0.1);
-          return t * r2 + (1 - t) * r1;
+          const sineEasedT = Math.sin((t - 0.5) * Math.PI) * 0.5 + 0.5;
+          t = (t + sineEasedT) * 0.5;
+          return ((xRight - thickness) - 0.1) * t;
         }
     );
 

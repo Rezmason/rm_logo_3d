@@ -1,0 +1,155 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <title>three.js webgl - geometry - extrude shapes</title>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, user-scalable=no, minimum-scale=1.0, maximum-scale=1.0">
+  <style>
+    html, body {
+      overflow: hidden;
+      height: 100%;
+    }
+
+    body {
+      background-color: black;
+      margin: 0;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+    }
+
+    #card {
+      display: grid;
+      grid-template:
+        "a" 40vh
+        "b" auto / 40vw;
+      font-size: 2vw;
+    }
+
+    #nav {
+      text-transform: uppercase;
+      color: white;
+      text-align: justify;
+      height: 1.15em;
+      line-height: 1.15;
+    }
+
+    #nav:after {
+      content: '';
+      display: inline-block;
+      width: 100%;
+    }
+
+    canvas#logo {
+      width: 100%;
+      height: 100%;
+      background-image: url();
+    }
+
+    canvas#logo.active {
+      background-image: none;
+    }
+</style>
+</head>
+
+<body>
+  <div id="card">
+    <canvas id="logo"></canvas>
+    <div id="nav">
+      <a id="projects" href="projects.html">projects</a>
+      <a id="beliefs" href="beliefs.html">beliefs</a>
+      <a id="links" href="links.html">links</a>
+      <a id="contact" href="contact.html">contact</a>
+    </div>
+  </div>
+
+  <script src="./lib/three.js"></script>
+  <script src="./lib/inobounce.min.js"></script>
+  <script src="./lib/loaders/OBJLoader.js" ></script>
+  <script>
+
+    const canvas = document.querySelector("canvas#logo");
+    if (canvas.getContext != null) {
+      canvas.classList.add("active");
+    }
+    const renderer = new THREE.WebGLRenderer({ canvas });
+
+    const cameraDistance = 6;
+
+    const scene = new THREE.Scene();
+    scene.fog = new THREE.Fog(0x0, cameraDistance - 1, cameraDistance + 4);
+
+    const camera = new THREE.PerspectiveCamera( 90, 1, 1 / 10000, 10000 );
+    camera.position.set(0, 0, cameraDistance );
+    scene.add(camera);
+
+    const resize = () => {
+      renderer.setSize( canvas.clientWidth, canvas.clientHeight );
+      camera.aspect = canvas.clientWidth / canvas.clientHeight;
+      camera.updateProjectionMatrix();
+    };
+    window.addEventListener("resize", resize);
+    resize();
+
+    const group = new THREE.Group();
+    scene.add(group);
+
+    const lights = new THREE.Group();
+    scene.add(lights);
+
+    const addLight = (x, y, z) => {
+      const light = new THREE.PointLight( 0xffffff );
+      light.decay = 2;
+      light.intensity = 0.4;
+      light.position.set(x, y, z);
+      lights.add( light );
+    };
+
+    addLight(-10, 10, 10);
+    addLight(10, 10, 10);
+
+    const loadedModel = new THREE.Group();
+    group.add(loadedModel);
+    const loader = new THREE.OBJLoader();
+    loader.load('rm3.obj', o => {
+      o = o.children[0];
+      loadedModel.add(o);
+      o.material = new THREE.MeshLambertMaterial({
+        emissive: 0x888888,
+        color: 0xFFFFFF,
+        fog: true
+      });
+    });
+
+    let [mouseX, mouseY, mouseZ] = [0, 0, 0];
+    const targetAngles = new Map([
+      ["projects", Math.PI * -0.375],
+      ["beliefs",  Math.PI * -0.125],
+      ["links",    Math.PI *  0.125],
+      ["contact",  Math.PI *  0.375],
+    ]);
+    const pan = ({screenX, screenY}) => [mouseX, mouseY] = [screenX / window.innerWidth - 0.5, screenY / window.innerHeight - 0.5];
+    window.addEventListener("mousemove", pan);
+    window.addEventListener("touchmove", ({touches}) => pan(touches[0]));
+    window.addEventListener("mouseover", ({target}) => {
+      mouseZ = targetAngles.get(target.id);
+      if (mouseZ == null) {
+        mouseZ = 0;
+      }
+    });
+
+    group.position.z = -6;
+    group.rotation.z = Math.PI;
+
+    const animate = time => {
+      requestAnimationFrame(animate);
+      group.position.z = group.position.z * 0.99;
+      group.rotation.z = (group.rotation.z * 0.99) + mouseZ * -(Math.PI * 0.5) * 0.01;
+      group.rotation.x = (group.rotation.x * 0.9) + mouseY * -(Math.PI * 0.5) * 0.1;
+      group.rotation.y = (group.rotation.y * 0.9) + mouseX * -(Math.PI * 0.5) * 0.1;
+      renderer.render(scene, camera);
+    }
+    animate(0);
+  </script>
+</body>
+</html>

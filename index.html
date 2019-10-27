@@ -24,6 +24,7 @@
 
   <script src="./lib/three.js"></script>
 
+  <script src="./lib/loaders/OBJLoader.js" ></script>
   <script src="./lib/exporters/STLExporter.js" ></script>
   <script src="./lib/loaders/SVGLoader.js"></script>
   <script src="./lib/postprocessing/EffectComposer.js"></script>
@@ -92,6 +93,23 @@
     const laidOutModel = new THREE.Group();
     group.add(laidOutModel);
     laidOutModel.visible = false;
+
+    const loadedModel = new THREE.Group();
+    group.add(loadedModel);
+    const loader = new THREE.OBJLoader();
+    loader.load('rm2.obj', o => {
+      o = o.children[0];
+      loadedModel.add(o);
+      o.material = new THREE.MeshPhysicalMaterial({
+        color: 0xFFFFFF,
+        roughness: 1,
+        metalness: 0,
+        reflectivity: 0,
+        emissive: 0x0
+      });
+      // loadedModel.add(new THREE.VertexNormalsHelper(o, 0.1, 0xFF0000, 1));
+    });
+
 
     const logoformUnions = makeLogoform().map(geoms => THREE.BufferGeometryUtils.mergeBufferGeometries(geoms));
 
@@ -197,7 +215,7 @@
     composer.addPass( renderPass );
 
     const halftonePass = new THREE.HalftonePass(0x220000, 0xFFFFD8, Math.pow(2, -4.65), 30, 0.7);
-    composer.addPass( halftonePass );
+    // composer.addPass( halftonePass );
 
     const bloomPass = new THREE.UnrealBloomPass(
       new THREE.Vector2( window.innerWidth, window.innerHeight ), 0.5, 1.5, 0
@@ -244,18 +262,28 @@
       switch (mode) {
         case 0:
           model.visible = true;
+          loadedModel.visible = false;
           laidOutModel.visible = false;
           composer.passes[composer.passes.length - 1].renderToScreen = true;
           renderPass.renderToScreen = false;
         break;
         case 1:
+          model.visible = false;
+          loadedModel.visible = true;
+          laidOutModel.visible = false;
+          composer.passes[composer.passes.length - 1].renderToScreen = true;
+          renderPass.renderToScreen = false;
+        break;
+        case 2:
           model.visible = true;
+          loadedModel.visible = false;
           laidOutModel.visible = false;
           composer.passes[composer.passes.length - 1].renderToScreen = false;
           renderPass.renderToScreen = true;
         break;
-        case 2:
+        case 3:
           model.visible = false;
+          loadedModel.visible = false;
           laidOutModel.visible = true;
           composer.passes[composer.passes.length - 1].renderToScreen = false;
           renderPass.renderToScreen = true;

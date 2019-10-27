@@ -1,5 +1,6 @@
 const makeCurve = (radius = 1, startRadians = 0, endRadians = 2, x = 0, y = 0, z = 0, rX = 0, rY = 0, rZ = 0, distortion = null) => {
-  const segments = distortion == null ? 1 : 20, steps = Math.max(1, Math.round(60 * (radius + 1) * Math.abs(endRadians - startRadians)));
+  const segments = 20, steps = Math.max(1, Math.round(60 * (radius + 1) * Math.abs(endRadians - startRadians)));
+  // const segments = 10, steps = Math.max(1, Math.round(10 * (radius + 1) * Math.abs(endRadians - startRadians)));
   const geom = new THREE.ExtrudeBufferGeometry(
     new THREE.Shape(
       [].concat(...
